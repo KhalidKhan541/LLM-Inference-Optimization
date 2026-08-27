@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  benchmark:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    volumes:
+      - ../results:/app/results
+      - ../visualizations:/app/visualizations
+      - model_cache:/app/cache
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - HF_TOKEN=${HF_TOKEN}
+    command: >
+      --model meta-llama/Llama-2-7b-hf
+      --output-dir /app/results
+
+  vllm-server:
+    image: vllm/vllm-openai:latest
+    volumes:
+      - model_cache:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+    command: >
+      --model meta-llama/Llama-2-7b-hf
+      --tensor-parallel-size 1
+      --max-model-len 4096
+      --gpu-memory-utilization 0.9
+
+  tgi-server:
+    image: ghcr.io/huggingface/text-generation-inference:latest
+    volumes:
+      - model_cache:/data
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8080:80"
+    environment:
+      - HF_TOKEN=${HF_TOKEN}
+      - MODEL_ID=meta-llama/Llama-2-7b-hf
+      - MAX_INPUT_LENGTH=4096
+      - MAX_TOTAL_TOKENS=4096
+      - MAX_BATCH_PREFILL_TOKENS=4096
+      - MAX_CONCURRENT_REQUESTS=64
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+volumes:
+  model_cache:
+  grafana_data:
+  prometheus_data:

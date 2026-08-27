@@ -1,0 +1,88 @@
+models:
+  - name: "meta-llama/Llama-2-7b-hf"
+    size: "7B"
+    context_length: 4096
+    description: "Llama 2 7B base model"
+  
+  - name: "meta-llama/Llama-2-13b-hf"
+    size: "13B"
+    context_length: 4096
+    description: "Llama 2 13B base model"
+  
+  - name: "mistralai/Mistral-7B-v0.1"
+    size: "7B"
+    context_length: 8192
+    description: "Mistral 7B v0.1"
+
+backends:
+  vllm:
+    tensor_parallel_size: 1
+    gpu_memory_utilization: 0.9
+    max_num_batched_tokens: 4096
+    max_num_seqs: 256
+    dtype: "auto"
+  
+  tgi:
+    hostname: "localhost"
+    port: 8080
+    max_batch_prefill_tokens: 4096
+    max_batch_total_tokens: 8192
+    max_concurrent_requests: 64
+    dtype: "float16"
+  
+  huggingface:
+    device: "auto"
+    torch_dtype: "float16"
+    attn_implementation: "sdpa"
+
+quantization:
+  methods:
+    - name: "fp16"
+      bits: 16
+      description: "Full precision baseline"
+    
+    - name: "int8"
+      bits: 8
+      method: "bitsandbytes"
+      description: "8-bit quantization with BitsAndBytes"
+    
+    - name: "int4"
+      bits: 4
+      method: "bitsandbytes"
+      description: "4-bit quantization with BitsAndBytes NF4"
+    
+    - name: "gptq"
+      bits: 4
+      description: "GPTQ quantization"
+      model_suffix: "-GPTQ"
+    
+    - name: "awq"
+      bits: 4
+      description: "AWQ quantization"
+      model_suffix: "-AWQ"
+
+batching:
+  max_batch_size: 32
+  max_wait_time_ms: 100
+  max_tokens_per_batch: 4096
+  strategies:
+    - name: "static"
+      description: "Fixed batch size processing"
+    
+    - name: "dynamic"
+      description: "Adaptive batching based on load"
+    
+    - name: "continuous"
+      description: "Continuous batching for high throughput"
+
+benchmark:
+  num_iterations: 10
+  max_tokens: 128
+  warmup_iterations: 3
+  batch_sizes: [1, 2, 4, 8, 16, 32]
+  concurrent_requests: [1, 2, 4, 8, 16]
+
+output:
+  results_dir: "results"
+  visualizations_dir: "visualizations"
+  report_format: ["markdown", "html"]
